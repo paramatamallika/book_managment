@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Book Management App (Realtime Database)</title>
+
+  <!-- Firebase SDKs (Compat Version) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 280px;
+      padding: 20px;
+      background-color: #f4f4f4;
+      border-right: 1px solid #ccc;
+    }
+
+    .sidebar h2 {
+      margin-bottom: 15px;
+    }
+
+    .sidebar input {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+    }
+
+    .sidebar button {
+      width: 100%;
+      padding: 10px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    /* Main Content */
+    .main {
+      flex: 1;
+      padding: 20px;
+    }
+
+    .book-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .book-card {
+      border: 1px solid #ccc;
+      padding: 10px;
+      border-radius: 5px;
+    }
+
+    .book-card img {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+    }
+
+    .book-card button {
+      width: 100%;
+      margin-top: 5px;
+      padding: 6px;
+      cursor: pointer;
+    }
+
+    @media (max-width: 900px) {
+      .book-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 600px) {
+      .book-grid {
+        grid-template-columns: repeat(1, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <h2>Add Book</h2>
+    <input type="text" id="title" placeholder="Title" />
+    <input type="text" id="author" placeholder="Author" />
+    <input type="number" id="price" placeholder="Price" />
+    <input type="text" id="image" placeholder="Cover Image URL" />
+    <button id="addBookBtn">Add Book</button>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main">
+    <h2>Books</h2>
+    <div class="book-grid" id="bookGrid"></div>
+  </div>
+
+  <script>
+    /* ================= FIREBASE CONFIG ================= */
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "bookmanagment-10719.firebaseapp.com",
+      databaseURL: "https://bookmanagment-10719-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "bookmanagment-10719",
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+
+    // Initialize Realtime Database
+    const database = firebase.database();
+    const booksRef = database.ref("books");
+
+    /* ================= ADD BOOK ================= */
+    document.getElementById("addBookBtn").addEventListener("click", () => {
+      const title = document.getElementById("title").value.trim();
+      const author = document.getElementById("author").value.trim();
+      const price = document.getElementById("price").value;
+      const image = document.getElementById("image").value.trim();
+
+      if (!title || !author || !price || !image) {
+        alert("All fields are required");
+        return;
+      }
+
+      // Create unique key using push()
+      const newBookRef = booksRef.push();
+
+      newBookRef.set({
+        title: title,
+        author: author,
+        price: Number(price),
+        coverImageURL: image,
+      });
+
+      // Clear inputs
+      document.getElementById("title").value = "";
+      document.getElementById("author").value = "";
+      document.getElementById("price").value = "";
+      document.getElementById("image").value = "";
+    });
+
+    /* ================= FETCH & RENDER BOOKS (REALTIME) ================= */
+    booksRef.on("value", (snapshot) => {
+      const grid = document.getElementById("bookGrid");
+      grid.innerHTML = "";
+
+      const data = snapshot.val();
+
+      if (!data) {
+        grid.innerHTML = "<p>No books available</p>";
+        return;
+      }
+
+      Object.keys(data).forEach((id) => {
+        const book = data[id];
+
+        const card = document.createElement("div");
+        card.className = "book-card";
+
+        card.innerHTML = `
+          <img src="${book.coverImageURL}" alt="Book Cover" />
+          <h3>${book.title}</h3>
+          <p><b>Author:</b> ${book.author}</p>
+          <p><b>Price:</b> ₹${book.price}</p>
+        `;
+
+        // Update Author
+        const updateBtn = document.createElement("button");
+        updateBtn.textContent = "Update Author";
+        updateBtn.onclick = () => {
+          const newAuthor = prompt("Enter new author name", book.author);
+          if (newAuthor) {
+            booksRef.child(id).update({ author: newAuthor });
+          }
+        };
+
+        // Delete Book
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "Delete";
+        deleteBtn.onclick = () => {
+          booksRef.child(id).remove();
+        };
+
+        // View Details
+        const viewBtn = document.createElement("button");
+        viewBtn.textContent = "View Details";
+        viewBtn.onclick = () => {
+          alert(
+            `Title: ${book.title}\nAuthor: ${book.author}\nPrice: ₹${book.price}`
+          );
+        };
+
+        card.append(updateBtn, deleteBtn, viewBtn);
+        grid.appendChild(card);
+      });
+    });
+
+    /* ================= DUMMY DATA (RUN ONLY ONCE) =================
+    const dummyBooks = [
+      { title: "Atomic Habits", author: "James Clear", price: 499, coverImageURL: "https://via.placeholder.com/300x200" },
+      { title: "Deep Work", author: "Cal Newport", price: 450, coverImageURL: "https://via.placeholder.com/300x200" },
+      { title: "Ikigai", author: "Hector Garcia", price: 350, coverImageURL: "https://via.placeholder.com/300x200" }
+    ];
+
+    dummyBooks.forEach(book => booksRef.push(book));
+    */
+  </script>
+</body>
+</html>
